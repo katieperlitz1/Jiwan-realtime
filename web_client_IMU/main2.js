@@ -18,7 +18,7 @@ let isRecording = false;
 let recordedData = [];
 let recordBtn;
 let downloadBtn;
-
+let sessionInfo = {}; // For subject, mode, startTime
 
 let trialInitBtn;
 
@@ -40,7 +40,6 @@ let ch8;
 
 let modeDropdown;
 
-
 let sensorHistory = Array(8)
   .fill()
   .map(() => new Array(300).fill(0));
@@ -56,8 +55,8 @@ let colors = [
   "magenta",
 ];
 
-let maxValue = 2000;
-let minValue = -2000;
+let maxValue = 4000;
+let minValue = -4000;
 let numChannels = 8;
 let gridX = 3,
 gridY = 3;
@@ -383,19 +382,21 @@ function drawGrid(gridStartX, gridStartY) {
 
   const activeChannels = getActiveChannels();
   let cols = gridX; // how many columns across
-  let rows = Math.ceil(activeChannels.length / cols); // how many rows needed
+  let rows = Math.ceil(activeChannels.length / cols);
+
   let availableWidth = width - gridStartX * 2;
-  let availableHeight = 600; // You can adjust this if you want a taller grid
+  let availableHeight = 300; // Smaller height (USED TO BE 600)
+
   let boxWidth = availableWidth / cols;
   let boxHeight = availableHeight / rows;
-  let size = Math.min(boxWidth, boxHeight); // Make boxes square
+  let size = Math.min(boxWidth, boxHeight) * 0.8; // Shrink boxes to 80%
 
   for (let i = 0; i < activeChannels.length; i++) {
     let idx = activeChannels[i];
     let col = i % cols;
     let row = Math.floor(i / cols);
-    let x = col * size;
-    let y = gridStartY + row * size;
+    let x = col * (size + 10); // Add a 10px margin between boxes
+    let y = gridStartY + row * (size + 10);
     let intensity = map(sensorValues[idx], minValue, maxValue, 255, 0);
 
     fill(intensity);
@@ -403,18 +404,13 @@ function drawGrid(gridStartX, gridStartY) {
     rect(x, y, size, size);
 
     fill(intensity < 128 ? 255 : 0);
-    textSize(16);
+    textSize(12); // Smaller text too
     textAlign(CENTER, CENTER);
-    text(
-      channelLabels[idx] || `Ch ${idx + 1}`,
-      x + size / 2,
-      y + size / 2 - 10
-    );
-    text(`Value: ${sensorValues[idx]}`, x + size / 2, y + size / 2 + 10);
+    text(channelLabels[idx] || `Ch ${idx + 1}`, x + size / 2, y + size / 2 - 8);
+    text(`Val: ${sensorValues[idx]}`, x + size / 2, y + size / 2 + 8);
   }
   pop();
 }
-
 
 function updateGraph(newValues) {
   for (let i = 0; i < numChannels; i++) {
@@ -447,53 +443,65 @@ function updateScaleRange() {
   }
 }
 
-
 function getActiveChannels() {
   return channelCheckboxes
     .slice(0, numChannels) // <<< only look at the correct number
-    .map((cb, idx) => cb.checked() ? idx : -1)
-    .filter(idx => idx !== -1);
+    .map((cb, idx) => (cb.checked() ? idx : -1))
+    .filter((idx) => idx !== -1);
 }
 
-  function updateChannelNum() {
-    if (modeDropdown.value() == "Analog") {
-      numChannels = 8;
-      sensorHistory = Array(8).fill().map(() => new Array(300).fill(0));
-      sensorValues = [0, 0, 0, 0, 0, 0, 0, 0];
-      channelLabels = ["Ch1", "Ch2", "Ch3", "Ch4", "Ch5", "Ch6", "Ch7", "Ch8"];
-    } else {
-      numChannels = 6;
-      sensorHistory = Array(6).fill().map(() => new Array(300).fill(0));
-      sensorValues = [0, 0, 0, 0, 0, 0];
-      channelLabels = ["AccX", "AccY", "AccZ", "GyrX", "GyrY", "GyrZ"];
-    }
-  
-    // NEW: Update checkboxes and labels dynamically
-    for (let i = 0; i < channelCheckboxes.length; i++) {
-      if (i < numChannels) {
-        channelCheckboxes[i].show();
-        labelInputs[i].show();
-        channelCheckboxes[i].elt.checked = true;
-        labelInputs[i].value(channelLabels[i]);
-      } else {
-        channelCheckboxes[i].hide();
-        labelInputs[i].hide();
-      }
-    }
+function updateChannelNum() {
+  if (modeDropdown.value() == "Analog") {
+    numChannels = 8;
+    sensorHistory = Array(8)
+      .fill()
+      .map(() => new Array(300).fill(0));
+    sensorValues = [0, 0, 0, 0, 0, 0, 0, 0];
+    channelLabels = ["Ch1", "Ch2", "Ch3", "Ch4", "Ch5", "Ch6", "Ch7", "Ch8"];
+  } else {
+    numChannels = 6;
+    sensorHistory = Array(6)
+      .fill()
+      .map(() => new Array(300).fill(0));
+    sensorValues = [0, 0, 0, 0, 0, 0];
+    channelLabels = ["AccX", "AccY", "AccZ", "GyrX", "GyrY", "GyrZ"];
   }
-  
 
-  function toggleRecording() {
-    isRecording = !isRecording;
-    if (isRecording) {
-      recordBtn.html("Stop Recording");
-      recordedData = []; // Clear old data
-      console.log("Recording started...");
+  // NEW: Update checkboxes and labels dynamically
+  for (let i = 0; i < channelCheckboxes.length; i++) {
+    if (i < numChannels) {
+      channelCheckboxes[i].show();
+      labelInputs[i].show();
+      channelCheckboxes[i].elt.checked = true;
+      labelInputs[i].value(channelLabels[i]);
     } else {
-      recordBtn.html("Start Recording");
-      console.log("Recording stopped.");
+      channelCheckboxes[i].hide();
+      labelInputs[i].hide();
     }
   }
+}
+
+function toggleRecording() {
+  isRecording = !isRecording;
+  if (isRecording) {
+    recordBtn.html("Stop Recording");
+    recordedData = []; // Clear old data
+
+    // Save session info
+    sessionInfo = {
+      subjectNumber: subjectTextView.value(),
+      mode: modeDropdown.value(),
+      startTime: new Date().toLocaleString(),
+    };
+
+    console.log("Recording started...");
+    console.log("Session Info:", sessionInfo);
+  } else {
+    recordBtn.html("Start Recording");
+    console.log("Recording stopped.");
+  }
+}
+  
   
 
   

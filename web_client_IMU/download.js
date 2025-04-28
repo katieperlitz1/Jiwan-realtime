@@ -28,20 +28,26 @@ function downloadCSV() {
 
   let csvContent = "data:text/csv;charset=utf-8,";
 
-  // Create CSV header
+  // --- Add session info at the top ---
+  csvContent += `Subject Number:,${sessionInfo.subjectNumber}\r\n`;
+  csvContent += `Mode:,${sessionInfo.mode}\r\n`;
+  csvContent += `Recording Start Time:,${sessionInfo.startTime}\r\n`;
+  csvContent += "\r\n"; // Empty line for spacing
+
+  // --- Create CSV header ---
   let header = ["timestamp"];
   for (let i = 0; i < numChannels; i++) {
     header.push(channelLabels[i] || `Ch${i + 1}`);
   }
   csvContent += header.join(",") + "\r\n";
 
-  // Add data rows
+  // --- Add data rows ---
   recordedData.forEach(entry => {
     let row = [entry.timestamp, ...entry.values];
     csvContent += row.join(",") + "\r\n";
   });
 
-  // Download
+  // --- Trigger download ---
   let encodedUri = encodeURI(csvContent);
   let link = document.createElement("a");
   link.setAttribute("href", encodedUri);
