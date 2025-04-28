@@ -14,6 +14,11 @@ let connectBtn;
 let playBtn;
 let startInHandBtn;
 let startTableTopBtn;
+let isRecording = false;
+let recordedData = [];
+let recordBtn;
+let downloadBtn;
+
 
 let trialInitBtn;
 
@@ -69,6 +74,17 @@ function setup() {
   mainContainer.style("width", "100%");
   mainContainer.parent(document.body);
   createCanvas(windowWidth - 20, 3500);
+
+  // === Status message area ===
+  statusDiv = createDiv('');
+  statusDiv.style("padding", "10px");
+  statusDiv.style("background", "#fff3cd");
+  statusDiv.style("border", "1px solid #ffeeba");
+  statusDiv.style("color", "#856404");
+  statusDiv.style("margin", "10px 20px");
+  statusDiv.style("font-size", "16px");
+  statusDiv.hide(); // hide initially
+  statusDiv.parent(mainContainer);
 
   // === Container for all top controls ===
   let topContainer = createDiv();
@@ -135,6 +151,18 @@ function setup() {
   restartBtn.mousePressed(restartNotifications);
   styleButton(restartBtn);
   topContainer.child(restartBtn);
+  // --- Record Button ---
+  recordBtn = createButton("Start Recording");
+  recordBtn.mousePressed(toggleRecording);
+  styleButton(recordBtn);
+  topContainer.child(recordBtn);
+
+  // --- Download Button ---
+  downloadBtn = createButton("Download CSV");
+  downloadBtn.mousePressed(downloadCSV);
+  styleButton(downloadBtn);
+  topContainer.child(downloadBtn);
+
 
 
   // === Container for channel checkboxes + labels ===
@@ -216,7 +244,15 @@ function draw() {
     } else {
       sensorValues = [acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z];
     }
+    
     updateSensorHistory();
+    if (isRecording) {
+      recordedData.push({
+        timestamp: millis(),
+        values: [...sensorValues],
+      });
+    }
+    
     background(255);
     let yOffset = 50;
     let padding = 20;
@@ -445,4 +481,19 @@ function getActiveChannels() {
       }
     }
   }
+  
+
+  function toggleRecording() {
+    isRecording = !isRecording;
+    if (isRecording) {
+      recordBtn.html("Stop Recording");
+      recordedData = []; // Clear old data
+      console.log("Recording started...");
+    } else {
+      recordBtn.html("Start Recording");
+      console.log("Recording stopped.");
+    }
+  }
+  
+
   
