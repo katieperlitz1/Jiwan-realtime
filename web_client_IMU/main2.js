@@ -5,44 +5,17 @@ const serviceUUID      = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
 const txCharacteristic = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 const rxCharacteristic = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
 
-// rxData
-let myValue = 0;
-
-// variables for the display of the data
-let SHOW_ACC = 0;
-let SHOW_GYR = 1;
-let SHOW_MAG = 2;
-let chart = SHOW_ACC;
-
-// text
-let textDelay = 1000/5; 
-let lastTextms = 0; 
-
-// drawing
-let offscreen; 
-let xPos = 0;                           // x position of the graph
-let chartData = [0, 0, 0, 0,   0, 0, 0, 0];
 
 /*
  * UI elements
  */
 let connectBtn;
-let recordingBtn;
+
 let playBtn;
 let startInHandBtn;
 let startTableTopBtn;
-let downloadBtn;
-let trialInitBtn;
 
-// data save
-let currentTrial=0;
-let currentBlock=0;
-let currentCondition=0;
-let currentGesture=0;
-let MotionDataArray = [];
-let SoundDataArray = [];
-let isRecording = false;
-let trialSet = [];
+let trialInitBtn;
 
 let acc_x;
 let acc_y;
@@ -62,33 +35,6 @@ let ch8;
 
 let modeDropdown;
 
-let accCheckboxes = {};
-let gyrCheckboxes = {};
-
-let accThreshold = { x: 1500, y: 1500, z: 1500 }; // default thresholds
-let alertTriggered = { x: false, y: false, z: false };
-
-// click markers
-let isClicked = false;
-let clickCounter = {
-  clickInternal: 0,
-  clickListener: function (val) {},
-  set click(val) {
-    this.clickInternal = val;
-    this.clickListener(val);
-  },
-  get click() {
-    return this.clickInternal;
-  },
-  registerListener: function (listener) {
-    this.clickListener = listener;
-  },
-  unregisterListner: function () {
-    this.clickListener = function () {
-      console.log("No Listener");
-    };
-  },
-};
 
 let sensorHistory = Array(8)
   .fill()
@@ -104,8 +50,7 @@ let colors = [
   "cyan",
   "magenta",
 ];
-let connectionStatus = "Connecting...";
-let socket;
+
 let maxValue = 2000;
 let minValue = -2000;
 let numChannels = 8;
@@ -123,7 +68,7 @@ function setup() {
   mainContainer.style("flex-direction", "column"); // Stack everything vertically
   mainContainer.style("width", "100%");
   mainContainer.parent(document.body);
-  createCanvas(windowWidth - 20, 2500);
+  createCanvas(windowWidth - 20, 3500);
 
   // === Container for all top controls ===
   let topContainer = createDiv();
@@ -147,10 +92,11 @@ function setup() {
   modeLabel.style("margin-bottom", "5px");
 
   modeDropdown = createSelect();
-  modeDropdown.option("IMU");
   modeDropdown.option("Analog");
-  modeDropdown.selected("IMU");
+  modeDropdown.option("IMU");
+  modeDropdown.selected("Analog");
   modeDropdown.changed(updateNotificationHandler);
+  modeDropdown.changed(updateChannelNum);
   modeDropdown.style("font-size", "16px");
   modeDropdown.style("padding", "5px");
   modeDropdown.style("width", "180px");
@@ -184,16 +130,6 @@ function setup() {
   connectBtn.mousePressed(bleConnect);
   styleButton(connectBtn);
   topContainer.child(connectBtn);
-
-  recordingBtn = createButton("Start Data Record");
-  recordingBtn.mousePressed(handleRecording);
-  styleButton(recordingBtn);
-  topContainer.child(recordingBtn);
-
-  downloadBtn = createButton("Download Data");
-  downloadBtn.mousePressed(downloadCSV);
-  styleButton(downloadBtn);
-  topContainer.child(downloadBtn);
 
   restartBtn = createButton("Restart Data Stream");
   restartBtn.mousePressed(restartNotifications);
@@ -269,26 +205,30 @@ function setup() {
 
 
 function windowResized() {
-  resizeCanvas(windowWidth - 20, 1800);
+  resizeCanvas(windowWidth - 20, 3500);
 }
 
 function draw() {
   if (isConnected) {
     updateChannelLabels();
-    sensorValues = [ch1, ch2, ch3, ch4, ch5, ch6, ch7, ch8];
+    if (modeDropdown.value() == "Analog") {
+      sensorValues = [ch1, ch2, ch3, ch4, ch5, ch6, ch7, ch8];
+    } else {
+      sensorValues = [acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z];
+    }
     updateSensorHistory();
     background(255);
-    let yOffset = 500;
+    let yOffset = 50;
     let padding = 20;
 
     drawLineChart(0, yOffset, width, 300);
-    yOffset += 600 + padding;
+    yOffset += 550 + padding;
 
     drawVerticalBarChart(0, yOffset, width, 400);
-    yOffset += 600 + padding;
+    yOffset += 400 + padding;
 
-    drawHorizontalBarChart(0, yOffset, width, 200);
-    yOffset += 250 + padding;
+    drawHorizontalBarChart(0, yOffset, width, 300);
+    yOffset += 350 + padding;
 
     drawGrid(50, yOffset); // No hardcoded y!
   }
@@ -297,7 +237,10 @@ function draw() {
 function drawLineChart(x, y, w, h) {
   push();
   translate(x, y);
-  fill(0);
+
+  fill(0);  
+
+
   textSize(16);
   textAlign(CENTER);
   text("Sensor Data Over Time", w / 2, 20);
@@ -316,7 +259,7 @@ function drawLineChart(x, y, w, h) {
   }
 
   // Draw legend
-  let legendX = 20;
+  let legendX = 50;
   let legendY = h + 40;
   let spacing = 20;
 
@@ -355,12 +298,12 @@ function drawVerticalBarChart(x, y, w, h) {
     rect(i * barWidth + 10, h - barHeight - 100, barWidth - 20, barHeight);
 
     fill(0);
-    textSize(12);
+    textSize(16);
     text(sensorValues[idx], i * barWidth + barWidth / 2, h - barHeight - 25);
     text(
       channelLabels[idx] || `Channel ${idx + 1}`,
       i * barWidth + barWidth / 2,
-      h - 5
+      h - 75
     );
   }
   pop();
@@ -374,14 +317,15 @@ function drawHorizontalBarChart(x, y, w, h) {
   textAlign(CENTER);
   text("Current Values (Horizontal Bars)", width / 2 - x, 20);
   const activeChannels = getActiveChannels();
-  let barHeight = (h - 60) / activeChannels.length;
+  let gap = 10; // adjust this value to make gaps bigger or smaller
+  let barHeight = (h - 60 - (activeChannels.length - 1) * gap) / activeChannels.length;
   let maxBarWidth = w - 120;
 
   for (let i = 0; i < activeChannels.length; i++) {
     let idx = activeChannels[i];
     fill(colors[idx % colors.length]);
     let barWidth = map(sensorValues[idx], minValue, maxValue, 0, maxBarWidth);
-    rect(100, 40 + i * barHeight, barWidth, barHeight * 0.8);
+    rect(100, 40 + i * (barHeight + gap), barWidth, barHeight);
 
     fill(0);
     textSize(12);
@@ -389,20 +333,26 @@ function drawHorizontalBarChart(x, y, w, h) {
     text(
       channelLabels[idx] || `Ch ${idx + 1}`,
       90,
-      40 + i * barHeight + barHeight / 2
+      40 + i * (barHeight + gap) + barHeight / 2
     );
     textAlign(LEFT);
-    text(sensorValues[idx], 110 + barWidth, 40 + i * barHeight + barHeight / 2);
+    text(sensorValues[idx], 110 + barWidth, 40 + i * (barHeight + gap) + barHeight / 2);
   }
   pop();
 }
 
 function drawGrid(gridStartX, gridStartY) {
+  push();
   translate(gridStartX, 0);
 
   const activeChannels = getActiveChannels();
-  let cols = gridX;
-  let size = boxSize;
+  let cols = gridX; // how many columns across
+  let rows = Math.ceil(activeChannels.length / cols); // how many rows needed
+  let availableWidth = width - gridStartX * 2;
+  let availableHeight = 600; // You can adjust this if you want a taller grid
+  let boxWidth = availableWidth / cols;
+  let boxHeight = availableHeight / rows;
+  let size = Math.min(boxWidth, boxHeight); // Make boxes square
 
   for (let i = 0; i < activeChannels.length; i++) {
     let idx = activeChannels[i];
@@ -426,7 +376,9 @@ function drawGrid(gridStartX, gridStartY) {
     );
     text(`Value: ${sensorValues[idx]}`, x + size / 2, y + size / 2 + 10);
   }
+  pop();
 }
+
 
 function updateGraph(newValues) {
   for (let i = 0; i < numChannels; i++) {
@@ -436,16 +388,6 @@ function updateGraph(newValues) {
   }
 }
 
-function handleRecording() {
-  if (isRecording) {
-    recordingBtn.elt.textContent = "Start Data Record";
-    isRecording = false;
-  } else {
-    recordingBtn.elt.textContent = "Stop Data Record";
-    MotionDataArray = [];
-    isRecording = true;
-  }
-}
 function updateSensorHistory() {
   for (let i = 0; i < sensorValues.length; i++) {
     sensorHistory[i].shift(); // remove oldest value
@@ -470,8 +412,37 @@ function updateScaleRange() {
 }
 
 
-  function getActiveChannels() {
-    return channelCheckboxes
-      .map((cb, idx) => cb.checked() ? idx : -1)
-      .filter(idx => idx !== -1);
+function getActiveChannels() {
+  return channelCheckboxes
+    .slice(0, numChannels) // <<< only look at the correct number
+    .map((cb, idx) => cb.checked() ? idx : -1)
+    .filter(idx => idx !== -1);
+}
+
+  function updateChannelNum() {
+    if (modeDropdown.value() == "Analog") {
+      numChannels = 8;
+      sensorHistory = Array(8).fill().map(() => new Array(300).fill(0));
+      sensorValues = [0, 0, 0, 0, 0, 0, 0, 0];
+      channelLabels = ["Ch1", "Ch2", "Ch3", "Ch4", "Ch5", "Ch6", "Ch7", "Ch8"];
+    } else {
+      numChannels = 6;
+      sensorHistory = Array(6).fill().map(() => new Array(300).fill(0));
+      sensorValues = [0, 0, 0, 0, 0, 0];
+      channelLabels = ["AccX", "AccY", "AccZ", "GyrX", "GyrY", "GyrZ"];
+    }
+  
+    // NEW: Update checkboxes and labels dynamically
+    for (let i = 0; i < channelCheckboxes.length; i++) {
+      if (i < numChannels) {
+        channelCheckboxes[i].show();
+        labelInputs[i].show();
+        channelCheckboxes[i].elt.checked = true;
+        labelInputs[i].value(channelLabels[i]);
+      } else {
+        channelCheckboxes[i].hide();
+        labelInputs[i].hide();
+      }
+    }
   }
+  

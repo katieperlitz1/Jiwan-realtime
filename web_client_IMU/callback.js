@@ -237,9 +237,6 @@ function handleNotificationsIMU(data) {
         imuData: imu_temp,
     };
 
-    if (isRecording) {
-        MotionDataArray.push(IMUData);
-    }
 }
 
 // For Analog mode
@@ -265,13 +262,6 @@ function handleNotificationsAnalog(data) {
     ch8 = analog_temp.ch8;
 
     console.log(analog_temp);
-
-    if (isRecording) {
-        MotionDataArray.push({
-            timestampCentral: millis(),
-            imuData: analog_temp,
-        });
-    }
 }
 
 
