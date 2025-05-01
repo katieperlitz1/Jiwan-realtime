@@ -6,6 +6,7 @@ let handleNotifications = handleNotificationsIMU; // Default handler
 // BLE Connect/Disconnect
 function bleConnect() {
     if (!isConnected) {
+        // Change name from "XIAO" to your device name from firmware code
         myBLE.connect(serviceUUID, "XIAO", gotCharacteristics);
         connectBtn.elt.textContent = 'Disconnect Device';
         console.log("Connecting to myBLE Device...");
