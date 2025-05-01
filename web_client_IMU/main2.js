@@ -328,6 +328,7 @@ function drawVerticalBarChart(x, y, w, h) {
 
   for (let i = 0; i < activeChannels.length; i++) {
     let idx = activeChannels[i];
+    noStroke();
     fill(colors[idx % colors.length]);
     let barHeight = map(sensorValues[idx], minValue, maxValue, 0, h - 40);
     rect(i * barWidth + 10, h - barHeight - 100, barWidth - 20, barHeight);
@@ -353,11 +354,13 @@ function drawHorizontalBarChart(x, y, w, h) {
   text("Current Values (Horizontal Bars)", width / 2 - x, 20);
   const activeChannels = getActiveChannels();
   let gap = 10; // adjust this value to make gaps bigger or smaller
-  let barHeight = (h - 60 - (activeChannels.length - 1) * gap) / activeChannels.length;
+  let barHeight =
+    (h - 60 - (activeChannels.length - 1) * gap) / activeChannels.length;
   let maxBarWidth = w - 120;
 
   for (let i = 0; i < activeChannels.length; i++) {
     let idx = activeChannels[i];
+    noStroke();
     fill(colors[idx % colors.length]);
     let barWidth = map(sensorValues[idx], minValue, maxValue, 0, maxBarWidth);
     rect(100, 40 + i * (barHeight + gap), barWidth, barHeight);
@@ -371,7 +374,11 @@ function drawHorizontalBarChart(x, y, w, h) {
       40 + i * (barHeight + gap) + barHeight / 2
     );
     textAlign(LEFT);
-    text(sensorValues[idx], 110 + barWidth, 40 + i * (barHeight + gap) + barHeight / 2);
+    text(
+      sensorValues[idx],
+      110 + barWidth,
+      40 + i * (barHeight + gap) + barHeight / 2
+    );
   }
   pop();
 }
